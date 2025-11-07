@@ -10,8 +10,8 @@ USE SCHEMA DEMO.DT_DEMO;
 USE WAREHOUSE WH_XS;
 
 DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUMULATIVE_PURCHASES;
-DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMER_SALES_DATA_HISTORY;
-DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INV_ALERT;
+DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders;
+DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT;
 DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT;
 
 DROP TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMERS;
@@ -28,11 +28,8 @@ select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1
 create or replace transient table orders as 
 select * from table(demo.dt_demo.generate_sales_data(10000,10));
 
-select *
-from product_stock_inv;
-
 /******************************************************************************************
- DYNAMIC TABLES 
+ BASE TABLES 
 *******************************************************************************************/
 
 -- customer information table, each customer has spending limits
@@ -58,7 +55,7 @@ from orders;
 /******************************************************************************************
  Combine customer and sales data. 
 *******************************************************************************************/
-CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.customer_sales_data_history
+CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.customer_orders
     LAG='DOWNSTREAM'
     WAREHOUSE= wh_xs
 AS
@@ -66,9 +63,9 @@ select
     c.cust_id as customer_id,
     c.customer_name,
     sales_data:order_id::number as order_id,
-    sales_data:purchase.prodid::number as product_id,
+    sales_data:purchase.product_id::number as product_id,
     sales_data:purchase.quantity::number as quantity,
-    sales_data:purchase.purchase_amount::number(10,2) as order_total,
+    sales_data:purchase.order_total::number(10,2) as order_total,
     sales_data:purchase.purchase_date::date as purchase_date
 from 
     demo.dt_demo.customers as c 
@@ -77,8 +74,8 @@ from
 ;
 
 -- quick check
-select * from demo.dt_demo.customer_sales_data_history;
-select count(*) from demo.dt_demo.customer_sales_data_history;
+select * from demo.dt_demo.customer_orders;
+select count(*) from demo.dt_demo.customer_orders;
 
 
 /******************************************************************************************
@@ -101,8 +98,8 @@ AS
         DATEDIFF(DAY,LAG(purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY purchase_date ASC),t1.purchase_date) AS days_since_last_purchase,
         customer_id || '-' || t1.product_id  || '-' || t1.purchase_date AS CUSTOMER_SK,
     FROM 
-        demo.dt_demo.customer_sales_data_history t1 
-        INNER JOIN demo.dt_demo.product_inventory p 
+        demo.dt_demo.customer_orders as t1 --Dynamic Table
+        INNER JOIN demo.dt_demo.product_inventory as p --Base Table
             ON t1.product_id = p.product_id      
 ;
 
@@ -120,7 +117,7 @@ insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_
 select count(*) from demo.dt_demo.orders;
 
 -- Check Dynamic Tables after a minute
-select count(*) from demo.dt_demo.customer_sales_data_history;
+select count(*) from demo.dt_demo.customer_orders;
 select count(*) from demo.dt_demo.sales_report;
 select * from demo.dt_demo.sales_report;
 
@@ -137,10 +134,10 @@ AS
         a.customer_id,
         customer_name,
         SUM(a.order_total) AS total_monthly_sales,
-        COUNT(CUSTOMER_SK) AS monthly_orders, 
+        COUNT(CUSTOMER_SK) AS total_monthly_orders, 
         COUNT(DISTINCT PRODUCT_ID) AS distinct_products,
     FROM 
-        demo.dt_demo.sales_report AS a
+        demo.dt_demo.sales_report AS a --Dynamic Tables
     GROUP BY  
         a.customer_id,
         a.customer_name,
@@ -157,7 +154,7 @@ ORDER BY
 /******************************************************************************************
  Create a table to quickly check our product inventory. (create an alert off this table.)
 *******************************************************************************************/
-CREATE OR REPLACE DYNAMIC TABLE DEMO.DT_DEMO.PRODUCT_INV_ALERT
+CREATE OR REPLACE DYNAMIC TABLE DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT
     LAG = '1 MINUTE'
     WAREHOUSE=wh_xs
     --REFRESH_MODE= AUTO
@@ -172,17 +169,17 @@ AS
         ROUND(((P.STOCK - TOTALUNITSOLD)/P.STOCK) *100,2) PERCENT_UNITLEFT,
         CURRENT_TIMESTAMP() AS ROWCREATIONTIME
     FROM 
-        DEMO.DT_DEMO.SALES_REPORT S 
-        JOIN DEMO.DT_DEMO.PRODUCT_INVENTORY AS p 
+        DEMO.DT_DEMO.SALES_REPORT AS S --Dynamic Table
+        JOIN DEMO.DT_DEMO.PRODUCT_INVENTORY AS p --Base Table
             ON S.PRODUCT_ID = p.PRODUCT_ID
     QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY PURCHASE_DATE DESC) = 1
 ;
 
 -- check products with low inventory and alert
-select * from DEMO.DT_DEMO.PRODUCT_INV_ALERT;
+select * from DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT;
 
 select * 
-from demo.dt_demo.PRODUCT_INV_ALERT 
+from demo.dt_demo.PRODUCT_INVENTORY_ALERT 
 --where percent_unitleft < 10
 order by unitsleft;
 
@@ -197,12 +194,12 @@ insert into orders select * from table(demo.dt_demo.generate_sales_data(5000,2))
  Cleanup - leave object for doing demos without running code. 
 *******************************************************************************************/
 ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUMULATIVE_PURCHASES SUSPEND;
-ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMER_SALES_DATA_HISTORY SUSPEND;
+ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders SUSPEND;
 ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PROD_INV_ALERT SUSPEND;
 ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT SUSPEND; 
 
 -- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUMULATIVE_PURCHASES RESUME;
--- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMER_SALES_DATA_HISTORY RESUME;
+-- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders RESUME;
 -- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PROD_INV_ALERT RESUME;
 -- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT RESUME; 
 
