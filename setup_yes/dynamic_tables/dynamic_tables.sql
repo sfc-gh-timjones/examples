@@ -14,14 +14,19 @@ DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMER_SALES_DATA_HISTORY;
 DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INV_ALERT;
 DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT;
 
-DROP TABLE IF EXISTS DEMO.DT_DEMO.CUST_INFO;
-DROP TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_STOCK_INV;
+DROP TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMERS;
+DROP TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INVENTORY;
 DROP TABLE IF EXISTS DEMO.DT_DEMO.SALES_DATA;
 
 -- Create tables and insert records 
-create or replace transient table cust_info as select * from table(demo.dt_demo.generate_customer_data(1000)) order by 1;
-create or replace transient table product_stock_inv as select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
-create or replace transient table sales_data as select * from table(demo.dt_demo.generate_sales_data(10000,10));
+create or replace transient table customers as 
+select * from table(demo.dt_demo.generate_customer_data(1000)) order by 1;
+
+create or replace transient table product_inventory as 
+select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
+
+create or replace transient table sales_data as 
+select * from table(demo.dt_demo.generate_sales_data(10000,10));
 
 select *
 from product_stock_inv;
@@ -31,11 +36,11 @@ from product_stock_inv;
 *******************************************************************************************/
 
 -- customer information table, each customer has spending limits
-select * from demo.dt_demo.cust_info order by cust_id;
+select * from demo.dt_demo.customers order by cust_id;
 
 -- product stock table, each product has stock level from fulfilment day
 
-select * from demo.dt_demo.product_stock_inv;
+select * from demo.dt_demo.product_inventory;
 
 -- sales data for products purchsaed online by various customers
 select * from demo.dt_demo.sales_data;
@@ -55,7 +60,7 @@ SELECT
     s.purchase:"quantity"::number(5) as quantity,
     s.purchase:"purchase_date"::date as salesdate
 FROM
-    demo.dt_demo.cust_info c 
+    demo.dt_demo.customers as c 
     INNER JOIN demo.dt_demo.sales_data s 
         ON c.cust_id = s.custid
 ;
@@ -86,7 +91,7 @@ AS
         customer_id || '-' || t1.product_id  || '-' || t1.salesdate AS CUSTOMER_SK,
     FROM 
         demo.dt_demo.customer_sales_data_history t1 
-        INNER JOIN demo.dt_demo.product_stock_inv p 
+        INNER JOIN demo.dt_demo.product_inventory p 
             ON t1.product_id = p.product_id      
 ;
 
@@ -156,16 +161,16 @@ AS
         CURRENT_TIMESTAMP() AS ROWCREATIONTIME
     FROM 
         demo.dt_demo.SALES_REPORT S 
-        JOIN demo.dt_demo.PRODUCT_STOCK_INV AS p 
+        JOIN demo.dt_demo.product_inventory AS p 
             ON S.PRODUCT_ID = p.product_id
     QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY SALESDATE DESC) = 1
 ;
 
 -- check products with low inventory and alert
-select * from demo.dt_demo.product_inv_alert;
+select * from demo.dt_demo.PRODUCT_INV_ALERT;
 
 select * 
-from demo.dt_demo.product_inv_alert 
+from demo.dt_demo.PRODUCT_INV_ALERT 
 --where percent_unitleft < 10
 order by unitsleft;
 
