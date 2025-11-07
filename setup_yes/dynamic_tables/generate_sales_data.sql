@@ -2,12 +2,13 @@
  FUNCTIONS FOR GENERATING DATA BELOW. ALSO IN QUICKSTART
  https://quickstarts.snowflake.com/guide/getting_started_with_dynamic_tables/index.html?index=..%2F..index#1
 ******************************************************************************************************************/
-
+use database demo;
+use schema dt_demo;
 --FUNCTION 3
-create or replace function gen_cust_purchase(num_records number,ndays number)
+create or replace function generate_sales_data(num_records number,ndays number)
 returns table (custid number(10), purchase variant)
 language python
-runtime_version=3.8
+runtime_version=3.9
 handler='genCustPurchase'
 packages = ('Faker')
 as $$

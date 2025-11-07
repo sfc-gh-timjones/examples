@@ -2,9 +2,9 @@
  FUNCTIONS FOR GENERATING DATA BELOW. ALSO IN QUICKSTART
  https://quickstarts.snowflake.com/guide/getting_started_with_dynamic_tables/index.html?index=..%2F..index#1
 ******************************************************************************************************************/
-
 --FUNCTION 1
-CREATE OR REPLACE FUNCTION gen_cust_info(num_records NUMBER)
+
+CREATE OR REPLACE FUNCTION generate_customer_data(num_records NUMBER)
 RETURNS TABLE (
     cust_id NUMBER(10), 
     customer_name VARCHAR(100), 
@@ -13,7 +13,7 @@ RETURNS TABLE (
     region VARCHAR(50)
 )
 LANGUAGE PYTHON
-RUNTIME_VERSION=3.8
+RUNTIME_VERSION=3.9
 HANDLER='CustTab'
 PACKAGES = ('Faker')
 AS $$
