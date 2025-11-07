@@ -16,7 +16,7 @@ DROP DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT;
 
 DROP TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMERS;
 DROP TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INVENTORY;
-DROP TABLE IF EXISTS DEMO.DT_DEMO.SALES_DATA;
+DROP TABLE IF EXISTS DEMO.DT_DEMO.ORDERS;
 
 -- Create tables and insert records 
 create or replace transient table customers as 
@@ -25,7 +25,7 @@ select * from table(demo.dt_demo.generate_customer_data(1000)) order by 1;
 create or replace transient table product_inventory as 
 select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
 
-create or replace transient table sales_data as 
+create or replace transient table orders as 
 select * from table(demo.dt_demo.generate_sales_data(10000,10));
 
 select *
@@ -43,7 +43,17 @@ select * from demo.dt_demo.customers order by cust_id;
 select * from demo.dt_demo.product_inventory;
 
 -- sales data for products purchsaed online by various customers
-select * from demo.dt_demo.sales_data;
+select * from demo.dt_demo.orders;
+
+select 
+    sales_data:order_id::number as order_id,
+    sales_data:custid::number as custid,
+    sales_data:purchase.product_id::number as prodid,
+    sales_data:purchase.quantity::number as quantity,
+    sales_data:purchase.order_total::number(10,2) as order_total,
+    sales_data:purchase.purchase_date::date as purchase_date
+from orders;
+
 
 /******************************************************************************************
  Combine customer and sales data. 
@@ -52,17 +62,18 @@ CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.customer_sales_data_history
     LAG='DOWNSTREAM'
     WAREHOUSE= wh_xs
 AS
-SELECT  
+select 
     c.cust_id as customer_id,
     c.customer_name,
-    s.purchase:"prodid"::number(5) as product_id,
-    s.purchase:"purchase_amount"::number(10) as saleprice,
-    s.purchase:"quantity"::number(5) as quantity,
-    s.purchase:"purchase_date"::date as salesdate
-FROM
+    sales_data:order_id::number as order_id,
+    sales_data:purchase.prodid::number as product_id,
+    sales_data:purchase.quantity::number as quantity,
+    sales_data:purchase.purchase_amount::number(10,2) as order_total,
+    sales_data:purchase.purchase_date::date as purchase_date
+from 
     demo.dt_demo.customers as c 
-    INNER JOIN demo.dt_demo.sales_data s 
-        ON c.cust_id = s.custid
+    join orders as s
+        on c.cust_id = s.sales_data:custid::number;
 ;
 
 -- quick check
@@ -83,12 +94,12 @@ AS
         t1.customer_name, 
         t1.product_id,
         p.product_name,
-        t1.saleprice,
+        t1.order_total,
         t1.quantity,
-        (t1.saleprice/t1.quantity) as unitsalesprice,
-        t1.salesdate,
-        DATEDIFF(DAY,LAG(salesdate) OVER (PARTITION BY t1.customer_id ORDER BY salesdate ASC),t1.salesdate) AS days_since_last_purchase,
-        customer_id || '-' || t1.product_id  || '-' || t1.salesdate AS CUSTOMER_SK,
+        (t1.order_total/t1.quantity) as unitsalesprice,
+        t1.purchase_date,
+        DATEDIFF(DAY,LAG(purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY purchase_date ASC),t1.purchase_date) AS days_since_last_purchase,
+        customer_id || '-' || t1.product_id  || '-' || t1.purchase_date AS CUSTOMER_SK,
     FROM 
         demo.dt_demo.customer_sales_data_history t1 
         INNER JOIN demo.dt_demo.product_inventory p 
@@ -103,10 +114,10 @@ select count(*) from demo.dt_demo.sales_report;
  Go add 5000 new sales to the sales table.  
 *******************************************************************************************/
 -- Add new records
-insert into demo.dt_demo.sales_data select * from table(demo.dt_demo.generate_sales_data(5000,2));
+insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(5000,2));
 
 -- Check raw base table
-select count(*) from demo.dt_demo.sales_data;
+select count(*) from demo.dt_demo.orders;
 
 -- Check Dynamic Tables after a minute
 select count(*) from demo.dt_demo.customer_sales_data_history;
@@ -122,10 +133,10 @@ CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.cumulative_purchases
     WAREHOUSE=wh_xs
 AS
     SELECT  
-        TO_CHAR(salesdate, 'YYYY-MM') AS month_year,
+        TO_CHAR(purchase_date, 'YYYY-MM') AS month_year,
         a.customer_id,
         customer_name,
-        SUM(a.saleprice) AS total_monthly_sales,
+        SUM(a.order_total) AS total_monthly_sales,
         COUNT(CUSTOMER_SK) AS monthly_orders, 
         COUNT(DISTINCT PRODUCT_ID) AS distinct_products,
     FROM 
@@ -146,28 +157,29 @@ ORDER BY
 /******************************************************************************************
  Create a table to quickly check our product inventory. (create an alert off this table.)
 *******************************************************************************************/
-CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.PRODUCT_INV_ALERT
+CREATE OR REPLACE DYNAMIC TABLE DEMO.DT_DEMO.PRODUCT_INV_ALERT
     LAG = '1 MINUTE'
     WAREHOUSE=wh_xs
     --REFRESH_MODE= AUTO
 AS
     SELECT 
         S.PRODUCT_ID, 
-        S.PRODUCT_NAME,SALESDATE AS LATEST_SALES_DATE,
-        STOCK AS BEGINING_STOCK,
-        SUM(S.QUANTITY) OVER (PARTITION BY S.PRODUCT_ID ORDER BY SALESDATE) TOTALUNITSOLD, 
-        (STOCK - TOTALUNITSOLD) AS UNITSLEFT,
-        ROUND(((STOCK-TOTALUNITSOLD)/STOCK) *100,2) PERCENT_UNITLEFT,
+        S.PRODUCT_NAME,
+        S.PURCHASE_DATE AS LATEST_SALES_DATE,
+        P.STOCK AS BEGINING_STOCK,
+        SUM(S.QUANTITY) OVER (PARTITION BY S.PRODUCT_ID ORDER BY S.PURCHASE_DATE) AS TOTALUNITSOLD, 
+        (P.STOCK - TOTALUNITSOLD) AS UNITSLEFT,
+        ROUND(((P.STOCK - TOTALUNITSOLD)/P.STOCK) *100,2) PERCENT_UNITLEFT,
         CURRENT_TIMESTAMP() AS ROWCREATIONTIME
     FROM 
-        demo.dt_demo.SALES_REPORT S 
-        JOIN demo.dt_demo.product_inventory AS p 
-            ON S.PRODUCT_ID = p.product_id
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY SALESDATE DESC) = 1
+        DEMO.DT_DEMO.SALES_REPORT S 
+        JOIN DEMO.DT_DEMO.PRODUCT_INVENTORY AS p 
+            ON S.PRODUCT_ID = p.PRODUCT_ID
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY PURCHASE_DATE DESC) = 1
 ;
 
 -- check products with low inventory and alert
-select * from demo.dt_demo.PRODUCT_INV_ALERT;
+select * from DEMO.DT_DEMO.PRODUCT_INV_ALERT;
 
 select * 
 from demo.dt_demo.PRODUCT_INV_ALERT 
@@ -175,7 +187,7 @@ from demo.dt_demo.PRODUCT_INV_ALERT
 order by unitsleft;
 
 -- Add new records
-insert into sales_data select * from table(demo.dt_demo.generate_sales_data(5000,2));
+insert into orders select * from table(demo.dt_demo.generate_sales_data(5000,2));
 
 /******************************************************************************************
  END

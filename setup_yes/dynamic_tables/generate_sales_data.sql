@@ -6,9 +6,11 @@ use database demo;
 use schema dt_demo;
 --FUNCTION 3
 create or replace function generate_sales_data(num_records number,ndays number)
-returns table (custid number(10), purchase variant)
+returns table (
+    sales_data variant
+)
 language python
-runtime_version=3.9
+runtime_version=3.12
 handler='genCustPurchase'
 packages = ('Faker')
 as $$
@@ -21,14 +23,13 @@ fake = Faker()
 class genCustPurchase:
     # Generate multiple customer purchase records
     def process(self, num_records,ndays):       
+        # Create base timestamp in milliseconds for unique order IDs
+        base_timestamp = int(datetime.now().timestamp() * 1000)
+        order_counter = 0
         for _ in range(num_records):
             c_id = fake.random_int(min=1001, max=1999)
+            order_id = base_timestamp + order_counter
             
-            #print(c_id)
-            customer_purchase = {
-                'custid': c_id,
-                'purchased': []
-            }
             # Get the current date
             current_date = datetime.now()
             
@@ -38,15 +39,19 @@ class genCustPurchase:
             # Generate a random date within the date range
             pdate = fake.date_between_dates(min_date,current_date)
             
-            purchase = {
-                'prodid': fake.random_int(min=101, max=130),
-                'quantity': fake.random_int(min=1, max=5),
-                'purchase_amount': round(random.uniform(10, 1000),2),
-                'purchase_date': pdate
+            # Create comprehensive sales data JSON
+            sales_record = {
+                'order_id': order_id,
+                'custid': c_id,
+                'purchase': {
+                    'product_id': fake.random_int(min=101, max=130),
+                    'quantity': fake.random_int(min=1, max=5),
+                    'order_total': float(round(random.uniform(10, 1000), 2)),
+                    'purchase_date': pdate.isoformat()  # Convert date to string for JSON
+                }
             }
-            customer_purchase['purchased'].append(purchase)
             
-            #customer_purchases.append(customer_purchase)
-            yield (c_id,purchase)
+            yield (sales_record,)
+            order_counter += 1
 
 $$;

@@ -5,9 +5,14 @@
 
 --FUNCTION 2
 create or replace function generate_product_inventory_data(num_records number)
-returns table (product_id number(10), product_name varchar(100), stock number(10,2), stockdate date)
+returns table (
+    product_id number(10), 
+    product_name varchar(100), 
+    stock number(10,2), 
+    stockdate date
+)
 language python
-runtime_version=3.9
+runtime_version=3.12
 handler='ProdTab'
 packages = ('Faker')
 as $$
