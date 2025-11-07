@@ -3,6 +3,11 @@
  https://quickstarts.snowflake.com/guide/getting_started_with_dynamic_tables/index.html?index=..%2F..index#1
 ******************************************************************************************************************/
 
+CREATE DATABASE IF NOT EXISTS DEMO;
+CREATE SCHEMA IF NOT EXISTS DEMO.DT_DEMO;
+USE DATABASE DEMO;
+USE SCHEMA DEMO.DT_DEMO;
+
 --FUNCTION 2
 create or replace function generate_product_inventory_data(num_records number)
 returns table (

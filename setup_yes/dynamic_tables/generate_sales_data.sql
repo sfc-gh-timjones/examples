@@ -2,10 +2,14 @@
  FUNCTIONS FOR GENERATING DATA BELOW. ALSO IN QUICKSTART
  https://quickstarts.snowflake.com/guide/getting_started_with_dynamic_tables/index.html?index=..%2F..index#1
 ******************************************************************************************************************/
-use database demo;
-use schema dt_demo;
+
+CREATE DATABASE IF NOT EXISTS DEMO;
+CREATE SCHEMA IF NOT EXISTS DEMO.DT_DEMO;
+USE DATABASE DEMO;
+USE SCHEMA DEMO.DT_DEMO;
+
 --FUNCTION 3
-create or replace function generate_sales_data(num_records number,ndays number)
+create or replace function generate_sales_data(num_records number)
 returns table (
     sales_data variant
 )
@@ -22,7 +26,7 @@ fake = Faker()
 
 class genCustPurchase:
     # Generate multiple customer purchase records
-    def process(self, num_records,ndays):       
+    def process(self, num_records):       
         # Create base timestamp in milliseconds for unique order IDs
         base_timestamp = int(datetime.now().timestamp() * 1000)
         order_counter = 0
@@ -33,8 +37,8 @@ class genCustPurchase:
             # Get the current date
             current_date = datetime.now()
             
-            # Calculate the maximum date (days from now)
-            min_date = current_date - timedelta(days=ndays)
+            # Calculate the maximum date (2 days back from now)
+            min_date = current_date - timedelta(days=2)
             
             # Generate a random date within the date range
             pdate = fake.date_between_dates(min_date,current_date)

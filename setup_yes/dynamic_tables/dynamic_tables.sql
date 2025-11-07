@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS DEMO.DT_DEMO.CUSTOMERS;
 DROP TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INVENTORY;
 DROP TABLE IF EXISTS DEMO.DT_DEMO.ORDERS;
 
--- Create tables and insert records 
+-- Create tables and insert records. Via User Defined Table Functions (UDTFs)
 create or replace transient table customers as 
 select * from table(demo.dt_demo.generate_customer_data(1000)) order by 1;
 
@@ -26,7 +26,7 @@ create or replace transient table product_inventory as
 select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
 
 create or replace transient table orders as 
-select * from table(demo.dt_demo.generate_sales_data(10000,10));
+select * from table(demo.dt_demo.generate_sales_data(10000));
 
 /******************************************************************************************
  BASE TABLES 
@@ -111,7 +111,7 @@ select count(*) from demo.dt_demo.sales_report;
  Go add 5000 new sales to the sales table.  
 *******************************************************************************************/
 -- Add new records
-insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(5000,2));
+insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(5000));
 
 -- Check raw base table
 select count(*) from demo.dt_demo.orders;
@@ -184,7 +184,7 @@ from demo.dt_demo.PRODUCT_INVENTORY_ALERT
 order by unitsleft;
 
 -- Add new records
-insert into orders select * from table(demo.dt_demo.generate_sales_data(5000,2));
+insert into orders select * from table(demo.dt_demo.generate_sales_data(5000));
 
 /******************************************************************************************
  END
