@@ -50,7 +50,7 @@ class genCustPurchase:
                 'purchase': {
                     'product_id': fake.random_int(min=101, max=130),
                     'quantity': fake.random_int(min=1, max=5),
-                    'order_total': float(round(random.uniform(10, 1000), 2)),
+                    'order_total': float(round(random.uniform(50, 10000), 2)),
                     'purchase_date': pdate.isoformat()  # Convert date to string for JSON
                 }
             }

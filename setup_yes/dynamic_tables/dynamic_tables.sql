@@ -89,6 +89,7 @@ AS
     SELECT
         t1.customer_id,
         t1.customer_name, 
+        t1.order_id,
         t1.product_id,
         p.product_name,
         t1.order_total,
@@ -130,25 +131,29 @@ CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.cumulative_purchases
     WAREHOUSE=wh_xs
 AS
     SELECT  
-        TO_CHAR(purchase_date, 'YYYY-MM') AS month_year,
         a.customer_id,
         customer_name,
-        SUM(a.order_total) AS total_monthly_sales,
-        COUNT(CUSTOMER_SK) AS total_monthly_orders, 
+        SUM(a.order_total) AS total_sales,
+        COUNT(CUSTOMER_SK) AS total_orders, 
         COUNT(DISTINCT PRODUCT_ID) AS distinct_products,
     FROM 
         demo.dt_demo.sales_report AS a --Dynamic Tables
+    WHERE a.purchase_date >= dateadd('mm', -6, getdate())
     GROUP BY  
         a.customer_id,
-        a.customer_name,
-        month_year
+        a.customer_name
 ;
 
-SELECT * 
+SELECT 
+    customer_name, 
+    total_sales,
+    total_orders,
+    distinct_products
 FROM  
     demo.dt_demo.cumulative_purchases 
 ORDER BY 
-    CUSTOMER_ID, MONTH_YEAR
+    total_sales desc 
+LIMIT 15
 ;
 
 /******************************************************************************************
