@@ -10,8 +10,10 @@ use warehouse my_compute_warehouse;
 --alter warehouse my_compute_warehouse set warehouse_size = small; 
 --alter warehouse my_compute_warehouse set warehouse_size = medium; 
 
-
---NOTE: the snowflake_sample_data tpch data is shared by default to all Snowflake accounts. 
+/*========================================================================================================
+NOTE: The TPC-H dataset is a standard benchmark for evaluating performance of analytical query engines. 
+The snowflake_sample_data tpch data is shared by default to all Snowflake accounts. 
+=========================================================================================================*/
 use schema snowflake_sample_data.tpch_sf100;   --tpch_sf10 | tpch_sf100 | tpch_sf1000
 
 alter session set use_cached_result = FALSE;
