@@ -142,11 +142,14 @@ NOTE: This table is used in the Streamlit application for visualization. No furt
 =====================================================================================================================================*/
 select * from demo.geospatial.national_highway_system_subset;
 
+
 /*=====================================================================================================================================
 STOP HERE. EVERYTHING ABOVE HERE IS ONLY CODE REQUIRED FOR STREAMLIT APPLICATION. 
 
 BELOW QUERIES ARE FOR AD HOC ANALYSIS. THESE ARE FOR DEMONSTRATION PURPOSES AND NOT TIED TO THE STREAMLIT APPLICATION.
 =====================================================================================================================================*/
+
+
 /*=====================================================================================================================================
 Run a query to see how many intersections each city has based on available geojson linestrings in the dataset.
 =====================================================================================================================================*/
