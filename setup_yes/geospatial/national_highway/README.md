@@ -1,12 +1,12 @@
 # 🛣️ Highway Geospatial & Weather Analysis
 
-This project provides an end-to-end solution for ingesting, analyzing, and visualizing geospatial and weather data related to national highways directly within Snowflake.
+This project provides a basic example for ingesting, analyzing, and visualizing geospatial and weather data related to national highways directly within Snowflake, using Streamlit in Snowflake.
 
 ---
 
 ## 📁 Repository Structure
 
-### `geojson/` **(Data Folder)**
+### `data_files/` 
 
 * Contains the **GeoJSON** files necessary for the project.
 * **Data Ingestion:** These files must be downloaded and manually uploaded to a **Snowflake Internal Stage**.
