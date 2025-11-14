@@ -24,9 +24,7 @@ comment = 'stage for my geojson files';
 
 /*=====================================================================================================================================
 IMPORTANT: 
-Manually go and upload the geojson files to the stage we just created. In a production environment, this wouldn't be manually and the 
-files would be automatically put in the Internal Stage or in the Cloud Bucket (S3, Blob, GCP Cloud Storage) that would be referenced by 
-an External Stage. 
+Manually go and upload the geojson files (downloaded from the repo) to the stage we just created. In a production environment, this wouldn't be manually and the files would be automatically put in the Internal Stage or in the Cloud Bucket (S3, Blob, GCP Cloud Storage) that would be referenced by an External Stage. 
 
 You can upload them to the stage by navigating to the stage (Catalog --> Database Explorer --> Navigate to stage location --> +Files in top right)
 =====================================================================================================================================*/
