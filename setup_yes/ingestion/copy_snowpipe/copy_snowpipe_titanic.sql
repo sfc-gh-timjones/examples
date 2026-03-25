@@ -36,20 +36,13 @@ OPTION 1: BASIC COPY INTO
 
 CREATE OR REPLACE TABLE titanic_1 (
     data VARIANT
-    ,src_file VARCHAR DEFAULT NULL
-    ,src_row_num INT DEFAULT NULL
-    ,src_last_modified TIMESTAMP_LTZ DEFAULT NULL
 );
 
 COPY INTO titanic_1
     FROM @s3_stage/etl_testing/copy_into_snowpipe/
     PATTERN = '.*\.parquet$'
     FILE_FORMAT = (TYPE = 'PARQUET')
-    INCLUDE_METADATA = (
-        src_file = METADATA$FILENAME
-        ,src_row_num = METADATA$FILE_ROW_NUMBER
-        ,src_last_modified = METADATA$FILE_LAST_MODIFIED
-    );
+;
 
 SELECT COUNT(*) AS rows_loaded FROM titanic_1;
 
@@ -69,9 +62,6 @@ SELECT
     ,Data:SibSp::int AS SibSp
     ,Data:Survived::int AS Survived
     ,Data:Ticket::varchar AS Ticket
-    ,src_file
-    ,src_row_num
-    ,src_last_modified
     ,Data AS Raw_Data 
 FROM titanic_1;
 
@@ -84,19 +74,20 @@ OPTION 2: LOAD VIA SNOWPIPE
   as they land in S3 via SQS event notifications. 
 ************************************************************************/
 
-CREATE OR REPLACE TABLE titanic_2 (
+CREATE TABLE IF NOT EXISTS titanic_1 (
     data VARIANT
 );
 
 CREATE OR REPLACE PIPE pipe_demo
 AUTO_INGEST = TRUE
   AS
-    COPY INTO titanic_2
+    COPY INTO titanic_1
     FROM @s3_stage/etl_testing/copy_into_snowpipe/
     PATTERN = '.*\.parquet$'
     FILE_FORMAT = (TYPE = 'PARQUET');
 
 SHOW PIPES;
+
 SELECT "name", "notification_channel" AS sqs_queue
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
@@ -106,10 +97,10 @@ SELECT SYSTEM$PIPE_STATUS('pipe_demo');
   Upload file to S3 bucket. Check that it loaded. Query semi-structured data. 
 ************************************************************************/
 
-SELECT COUNT(*) AS rows_loaded FROM titanic_2;
+SELECT COUNT(*) AS rows_loaded FROM titanic_1;
 
 SELECT *
-FROM titanic_2;
+FROM titanic_1;
 
 SELECT 
      Data:Age::numeric(38,2) AS Age
@@ -125,7 +116,7 @@ SELECT
     ,Data:Survived::int AS Survived
     ,Data:Ticket::varchar AS Ticket
     ,Data AS Raw_Data 
-FROM titanic_2;
+FROM titanic_1;
 
 /***********************************************************************
   Materialize flattened data with a Dynamic Table. 
@@ -152,7 +143,7 @@ CREATE OR REPLACE DYNAMIC TABLE my_table
         ,Data:Survived::int AS Survived
         ,Data:Ticket::varchar AS Ticket
         ,Data AS Raw_Data 
-    FROM titanic_2
+    FROM titanic_1
   ;
 
 SELECT * 
@@ -188,7 +179,7 @@ SELECT *
       )
     );
 
-CREATE OR REPLACE TABLE titanic_3
+CREATE OR REPLACE TABLE titanic_2
   ENABLE_SCHEMA_EVOLUTION = TRUE
   USING TEMPLATE (
     SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*))
@@ -200,70 +191,86 @@ CREATE OR REPLACE TABLE titanic_3
         )
       ));
 
-DESCRIBE TABLE titanic_3;
+DESCRIBE TABLE titanic_2;
+SELECT * FROM titanic_2;
 
-COPY INTO titanic_3 FROM @s3_stage/etl_testing/copy_into_snowpipe/
+COPY INTO titanic_2 FROM @s3_stage/etl_testing/copy_into_snowpipe/
   FILES = ( 'titanic.parquet' )
   FILE_FORMAT = (FORMAT_NAME= 'my_parquet_file_format')
   MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
 
-SELECT COUNT(*) AS rows_loaded FROM titanic_3;
+SELECT COUNT(*) AS rows_loaded FROM titanic_2;
 
 SELECT *
-FROM titanic_3;
+FROM titanic_2
+ORDER BY "Cabin";
 
 /***********************************************************************
   Step 2: Load a file with a missing column (no Cabin).
   The NOT NULL constraint on Cabin is dropped automatically.
 ************************************************************************/
 
-COPY INTO titanic_3 FROM @s3_stage/etl_testing/copy_into_snowpipe/
+--UPLOAD new titanic_no_cabin.parquet to cloud storage before running.
+COPY INTO titanic_2 FROM @s3_stage/etl_testing/copy_into_snowpipe/
   FILES = ( 'titanic_no_cabin.parquet' )
   FILE_FORMAT = (FORMAT_NAME= 'my_parquet_file_format')
   MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
 
-SELECT COUNT(*) AS rows_loaded FROM titanic_3;
+SELECT COUNT(*) AS rows_loaded FROM titanic_2;
 
-DESCRIBE TABLE titanic_3;
+SELECT *
+FROM titanic_2
+ORDER BY "Cabin";
 
 /***********************************************************************
   Step 3: Load a file with a new column (Embarked_City).
   The column is automatically added to the table.
 ************************************************************************/
 
-COPY INTO titanic_3 FROM @s3_stage/etl_testing/copy_into_snowpipe/
+COPY INTO titanic_2 FROM @s3_stage/etl_testing/copy_into_snowpipe/
   FILES = ( 'titanic_with_city.parquet' )
   FILE_FORMAT = (FORMAT_NAME= 'my_parquet_file_format')
   MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
 
-SELECT COUNT(*) AS rows_loaded FROM titanic_3;
+SELECT COUNT(*) AS rows_loaded FROM titanic_2;
 
-DESCRIBE TABLE titanic_3;
+DESCRIBE TABLE titanic_2;
 
-SELECT * FROM titanic_3 WHERE Embarked_City IS NOT NULL LIMIT 10;
-
-SELECT * FROM titanic_3 WHERE Cabin IS NULL LIMIT 10;
+SELECT * FROM titanic_2 ORDER BY Embarked_City;
 
 /***********************************************************************
   Step 4: Automate ongoing loads with a Task.
 ************************************************************************/
+CREATE OR REPLACE TABLE titanic_3 (
+    data VARIANT
+);
 
 CREATE OR REPLACE TASK load_my_data 
     WAREHOUSE = wh_xs
     SCHEDULE = '30 minutes'
     --SCHEDULE = 'USING CRON 15 8 * * * America/Denver' --Daily at 8:15am
     AS
-        COPY INTO titanic_3 
+        COPY INTO titanic_3
         FROM @s3_stage/etl_testing/copy_into_snowpipe/
         PATTERN = '.*\.parquet$'
-        FILE_FORMAT = (FORMAT_NAME= 'my_parquet_file_format')
-        MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
-        ON_ERROR = CONTINUE;
+        FILE_FORMAT = (TYPE = 'PARQUET');
 
 EXECUTE TASK load_my_data;
 
 SELECT *
 FROM titanic_3;
+
+SELECT 
+     Data:Sex::varchar AS Sex
+    ,Data:Embarked_City::varchar as Embarked_City
+    ,avg(Data:Age)::numeric(38,1) AS Avg_Age
+    ,avg(Data:Fare)::numeric(38,2) AS Avg_Fare
+    ,count(*) as row_count
+FROM titanic_3
+GROUP BY 
+    Embarked_City
+    ,Sex 
+ORDER BY Embarked_City;
 
 /***********************************************************************
 OPTION 4: Query stage directly & COPY with transformation.
@@ -288,6 +295,7 @@ FROM
         ,t.$1:Age::numeric(38,2) AS Age
         ,t.$1:Cabin::varchar AS Cabin
         ,t.$1:Embarked::varchar AS Embarked
+        ,t.$1:Embarked_City::varchar AS Embarked_City
         ,t.$1:Fare::numeric(38,2) AS Fare
         ,t.$1:Name::varchar AS Name
         ,t.$1:Parch::int AS Parch
