@@ -26,7 +26,7 @@ create or replace transient table product_inventory as
 select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
 
 create or replace transient table orders as 
-select * from table(demo.dt_demo.generate_sales_data(10000));
+select * from table(demo.dt_demo.generate_sales_data(5000));
 
 /******************************************************************************************
  BASE TABLES 
@@ -109,10 +109,10 @@ select * from demo.dt_demo.sales_report;
 select count(*) from demo.dt_demo.sales_report;
 
 /******************************************************************************************
- Go add 5000 new sales to the sales table.  
+ Go add new sales to the sales table.  
 *******************************************************************************************/
 -- Add new records
-insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(5000));
+insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(2000));
 
 -- Check raw base table
 select count(*) from demo.dt_demo.orders;
@@ -181,15 +181,13 @@ AS
 ;
 
 -- check products with low inventory and alert
-select * from DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT;
-
 select * 
-from demo.dt_demo.PRODUCT_INVENTORY_ALERT 
+from DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT 
 --where percent_unitleft < 10
 order by unitsleft;
 
 -- Add new records
-insert into orders select * from table(demo.dt_demo.generate_sales_data(5000));
+insert into orders select * from table(demo.dt_demo.generate_sales_data(2000));
 
 /******************************************************************************************
  END
