@@ -152,3 +152,10 @@ FROM DEMO.SEMI_STRUCTURED_DEMO.PROVIDER_NESTED_RAW,
 GROUP BY 1, 2, 3
 ORDER BY total_providers DESC;
 
+
+-- ============================================================================
+-- CLEANUP
+-- ============================================================================
+
+--Drop all created objects in the schema. 
+DROP SCHEMA DEMO.SEMI_STRUCTURED_DEMO;
