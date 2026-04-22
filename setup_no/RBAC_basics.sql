@@ -56,6 +56,17 @@
 =============================================================
 */
 
+
+/*=============================================================
+  CLEANUP - REQUIRED - START FROM A CLEAN ENVIRONMENT
+=============================================================*/
+USE ROLE ACCOUNTADMIN;
+DROP DATABASE IF EXISTS ENGINEERING_DB;
+DROP WAREHOUSE IF EXISTS ENG_DEV_WH;
+DROP WAREHOUSE IF EXISTS INTERN_WH;
+DROP ROLE IF EXISTS ENGINEER_ROLE;
+DROP ROLE IF EXISTS INTERN_ROLE;
+
 -- =========================================================
 -- STEP 1: ACCOUNTADMIN Creates Roles & Establishes Hierarchy
 -- =========================================================
