@@ -19,13 +19,13 @@ DROP TABLE IF EXISTS DEMO.DT_DEMO.PRODUCT_INVENTORY;
 DROP TABLE IF EXISTS DEMO.DT_DEMO.ORDERS;
 
 -- Create tables and insert records. Via User Defined Table Functions (UDTFs)
-create or replace transient table customers as 
+create or replace transient table demo.dt_demo.customers as 
 select * from table(demo.dt_demo.generate_customer_data(1000)) order by 1;
 
-create or replace transient table product_inventory as 
+create or replace transient table demo.dt_demo.product_inventory as 
 select * from table(demo.dt_demo.generate_product_inventory_data(30)) order by 1;
 
-create or replace transient table orders as 
+create or replace transient table demo.dt_demo.orders as 
 select * from table(demo.dt_demo.generate_sales_data(5000));
 
 /******************************************************************************************
@@ -49,7 +49,7 @@ select
     sales_data:purchase.quantity::number as quantity,
     sales_data:purchase.order_total::number(10,2) as order_total,
     sales_data:purchase.purchase_date::date as purchase_date
-from orders;
+from demo.dt_demo.orders;
 
 
 /******************************************************************************************
@@ -60,16 +60,17 @@ CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.customer_orders
     WAREHOUSE= wh_xs
 AS
 select 
+    s.sales_data:order_id::number as order_id,
     c.cust_id as customer_id,
     c.customer_name,
-    sales_data:order_id::number as order_id,
-    sales_data:purchase.product_id::number as product_id,
-    sales_data:purchase.quantity::number as quantity,
-    sales_data:purchase.order_total::number(10,2) as order_total,
-    sales_data:purchase.purchase_date::date as purchase_date
+    c.region, 
+    s.sales_data:purchase.product_id::number as product_id,
+    s.sales_data:purchase.quantity::number as quantity,
+    s.sales_data:purchase.order_total::number(10,2) as order_total,
+    s.sales_data:purchase.purchase_date::date as purchase_date
 from 
     demo.dt_demo.customers as c 
-    join orders as s
+    join demo.dt_demo.orders as s
         on c.cust_id = s.sales_data:custid::number;
 ;
 
@@ -96,8 +97,8 @@ AS
         t1.quantity,
         (t1.order_total/t1.quantity) as unitsalesprice,
         t1.purchase_date,
-        DATEDIFF(DAY,LAG(purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY purchase_date ASC),t1.purchase_date) AS days_since_last_purchase,
-        customer_id || '-' || t1.product_id  || '-' || t1.purchase_date AS CUSTOMER_SK,
+        DATEDIFF(DAY,LAG(t1.purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY t1.purchase_date ASC),t1.purchase_date) AS days_since_last_purchase,
+        t1.customer_id || '-' || t1.product_id  || '-' || t1.purchase_date AS CUSTOMER_SK,
     FROM 
         demo.dt_demo.customer_orders as t1 --Dynamic Table
         INNER JOIN demo.dt_demo.product_inventory as p --Base Table
@@ -132,10 +133,10 @@ CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.cumulative_purchases
 AS
     SELECT  
         a.customer_id,
-        customer_name,
+        a.customer_name,
         SUM(a.order_total) AS total_sales,
-        COUNT(CUSTOMER_SK) AS total_orders, 
-        COUNT(DISTINCT PRODUCT_ID) AS distinct_products,
+        COUNT(a.CUSTOMER_SK) AS total_orders, 
+        COUNT(DISTINCT a.PRODUCT_ID) AS distinct_products,
     FROM 
         demo.dt_demo.sales_report AS a --Dynamic Tables
     WHERE a.purchase_date >= dateadd('mm', -6, getdate())
@@ -177,7 +178,7 @@ AS
         DEMO.DT_DEMO.SALES_REPORT AS S --Dynamic Table
         JOIN DEMO.DT_DEMO.PRODUCT_INVENTORY AS p --Base Table
             ON S.PRODUCT_ID = p.PRODUCT_ID
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY PURCHASE_DATE DESC) = 1
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY S.PRODUCT_ID ORDER BY S.PURCHASE_DATE DESC) = 1
 ;
 
 -- check products with low inventory and alert
@@ -187,7 +188,7 @@ from DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT
 order by unitsleft;
 
 -- Add new records
-insert into orders select * from table(demo.dt_demo.generate_sales_data(2000));
+insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(2000));
 
 /******************************************************************************************
  END
