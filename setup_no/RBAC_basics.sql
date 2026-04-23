@@ -231,6 +231,7 @@ USE ROLE ENGINEER_ROLE;
 
 INSERT INTO ENGINEERING_DB.ENG_SCHEMA.COMPANY_PROJECTS VALUES (6, 'Intern Project A', 'Active', 0, 'Intern');
 
+--Intern can see that data that the engineering role just inserted. 
 USE ROLE INTERN_ROLE;
 SELECT * FROM ENGINEERING_DB.ENG_SCHEMA.COMPANY_PROJECTS;
 
