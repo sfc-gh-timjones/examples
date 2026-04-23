@@ -97,7 +97,7 @@ AS
         t1.quantity,
         (t1.order_total/t1.quantity) as unitsalesprice,
         t1.purchase_date,
-        DATEDIFF(DAY,LAG(t1.purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY t1.purchase_date ASC),t1.purchase_date) AS days_since_last_purchase,
+        DATEDIFF(DAY,LAG(t1.purchase_date) OVER (PARTITION BY t1.customer_id ORDER BY t1.purchase_date ASC, t1.order_id ASC),t1.purchase_date) AS days_since_last_purchase,
         t1.customer_id || '-' || t1.product_id  || '-' || t1.purchase_date AS CUSTOMER_SK,
     FROM 
         demo.dt_demo.customer_orders as t1 --Dynamic Table
@@ -202,10 +202,8 @@ ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders SUSPEND;
 ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PROD_INV_ALERT SUSPEND;
 ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT SUSPEND; 
 
-/*
-ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUMULATIVE_PURCHASES RESUME;
-ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders RESUME;
-ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PROD_INV_ALERT RESUME;
-ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT RESUME; 
-*/
+-- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.CUMULATIVE_PURCHASES RESUME;
+-- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.customer_orders RESUME;
+-- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.PROD_INV_ALERT RESUME;
+-- ALTER DYNAMIC TABLE IF EXISTS DEMO.DT_DEMO.SALES_REPORT RESUME; 
 
