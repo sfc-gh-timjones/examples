@@ -58,6 +58,7 @@ from demo.dt_demo.orders;
 CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.customer_orders
     LAG='DOWNSTREAM'
     WAREHOUSE= wh_xs
+    REFRESH_MODE = INCREMENTAL
 AS
 select 
     s.sales_data:order_id::number as order_id,
@@ -84,7 +85,7 @@ select count(*) from demo.dt_demo.customer_orders;
 *******************************************************************************************/
 CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.sales_report
     LAG = '1 MINUTE'
-    WAREHOUSE=wh_xs
+    WAREHOUSE = wh_xs
     REFRESH_MODE = INCREMENTAL
 AS
     SELECT
@@ -110,26 +111,12 @@ select * from demo.dt_demo.sales_report;
 select count(*) from demo.dt_demo.sales_report;
 
 /******************************************************************************************
- Go add new sales to the sales table.  
-*******************************************************************************************/
--- Add new records
-insert into demo.dt_demo.orders select * from table(demo.dt_demo.generate_sales_data(2000));
-
--- Check raw base table
-select count(*) from demo.dt_demo.orders;
-
--- Check Dynamic Tables after a minute
-select count(*) from demo.dt_demo.customer_orders;
-select count(*) from demo.dt_demo.sales_report;
-select * from demo.dt_demo.sales_report;
-
-
-/******************************************************************************************
  Create a table that aggregates sales by customer + month.  
 *******************************************************************************************/
 CREATE OR REPLACE DYNAMIC TABLE demo.dt_demo.cumulative_purchases
     LAG = '1 MINUTE'
-    WAREHOUSE=wh_xs
+    WAREHOUSE = wh_xs
+    REFRESH_MODE = INCREMENTAL
 AS
     SELECT  
         a.customer_id,
@@ -162,8 +149,8 @@ LIMIT 15
 *******************************************************************************************/
 CREATE OR REPLACE DYNAMIC TABLE DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT
     LAG = '1 MINUTE'
-    WAREHOUSE=wh_xs
-    --REFRESH_MODE= AUTO
+    WAREHOUSE = wh_xs
+    ROW_TIMESTAMP = TRUE
 AS
     SELECT 
         S.PRODUCT_ID, 
@@ -172,8 +159,7 @@ AS
         P.STOCK AS BEGINING_STOCK,
         SUM(S.QUANTITY) OVER (PARTITION BY S.PRODUCT_ID ORDER BY S.PURCHASE_DATE) AS TOTALUNITSOLD, 
         (P.STOCK - TOTALUNITSOLD) AS UNITSLEFT,
-        ROUND(((P.STOCK - TOTALUNITSOLD)/P.STOCK) *100,2) PERCENT_UNITLEFT,
-        CURRENT_TIMESTAMP() AS ROWCREATIONTIME
+        ROUND(((P.STOCK - TOTALUNITSOLD)/P.STOCK) *100,2) PERCENT_UNITLEFT
     FROM 
         DEMO.DT_DEMO.SALES_REPORT AS S --Dynamic Table
         JOIN DEMO.DT_DEMO.PRODUCT_INVENTORY AS p --Base Table
@@ -182,7 +168,9 @@ AS
 ;
 
 -- check products with low inventory and alert
-select * 
+select 
+    *, 
+    METADATA$ROW_LAST_COMMIT_TIME AS ROW_CREATION_TIME,
 from DEMO.DT_DEMO.PRODUCT_INVENTORY_ALERT 
 --where percent_unitleft < 10
 order by unitsleft;
